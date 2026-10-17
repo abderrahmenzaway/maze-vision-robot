@@ -68,38 +68,29 @@ float readDistanceCm(void)
 }
 
 // ============================ DISPLAY ==============================
-// Draws one bar per QTR sensor
-static void drawSensorBars(void)
-{
-  uint16_t x_pos = 0;
-  qtr.readLineBlack(SensorValues);
-  for (uint8_t i = 0; i < SENSORCOUNT; i++) {
-    uint16_t h = map(SensorValues[i], 0, 1000, 0, 25);
-    display.fillRoundRect(x_pos, 30, 6, h, 2, WHITE);
-    x_pos += 8;
-  }
-}
-
-// Shows gyro angle + sensor bars
+// Shows the heading, the front distance and the two side wall sensors
 void showSensorScreen(void)
 {
-  display.setCursor(0, 5);
-  display.print("Angle: ");
-  display.setTextSize(2);
-  display.setCursor(40, 5);
-  display.print(getAngle());
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  drawSensorBars();
-  display.display();
-  display.clearDisplay();
-}
 
-// Shows sensor bars only
-void showSensorBars(void)
-{
-  drawSensorBars();
+  display.setCursor(0, 0);
+  display.print("Angle: ");
+  display.print(getAngle());
+
+  display.setCursor(0, 16);
+  display.print("Front: ");
+  display.print(readDistanceCm());
+  display.print(" cm");
+
+  display.setCursor(0, 32);
+  display.print("Left IR: ");
+  display.print(readProximityLeft());
+  display.print("  Right IR: ");
+  display.print(readProximityRight());
+
   display.display();
-  display.clearDisplay();
 }
 
 void showText(String message)

@@ -87,19 +87,17 @@ All settings are at the top of `cube_counter.py`:
 
 | File | Contents |
 |---|---|
-| `maze_robot.ino` | Pins, globals, `setup()`, `loop()`, startup sequence (gyro calibration, then sensor calibration) |
+| `maze_robot.ino` | Pins, globals, `setup()`, `loop()`, startup sequence (gyro calibration) |
 | `Gyro.ino` | MPU6050 with its DMP: heading reading, PID straight moves (`gyroDriveStraightPID`) and PID turns to an angle (`gyroTurnPID`) |
 | `Utils.ino` | Motors (TB6612FNG), ultrasonic distance in cm (`readDistanceCm`), left / right infrared proximity sensors (`readProximityLeft/Right`), RGB LED, buzzer, OLED |
-| `Line_Follower.ino` | Line sensor calibration and PID line following |
-| `Bluetooth.ino` | Remote control over Bluetooth (HC-05) for tests |
 
-This version starts in Bluetooth remote control mode (`loop()` calls `handleVoiceCommand()`); the competition's maze sequence is not included.
+After the gyro calibration, `loop()` shows the heading, the front distance and both side walls on the OLED, which is used to check the sensors before a run. The competition's maze sequence is not included in this version.
 
 **Gyro turns, how they work:** the MPU6050's on-chip motion processor (DMP) gives the yaw angle; `gyroTurnPID` spins the robot until the heading error to the target angle is close to zero, with a PD correction on the motor speeds. A second version (`gyroTurnPID_v2`) takes the shortest way around when the angle wraps past ±180°.
 
 ### Build and flash
 
-1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and these libraries: Adafruit SSD1306, Adafruit GFX, SparkFun TB6612FNG, QTRSensors (Pololu), I2Cdevlib MPU6050.
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and these libraries: Adafruit SSD1306, Adafruit GFX, SparkFun TB6612FNG, I2Cdevlib MPU6050.
 2. Open `arduino/maze_robot/maze_robot.ino`, select **Arduino Mega or Mega 2560**, and upload.
 
 ## Repository layout
