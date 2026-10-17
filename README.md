@@ -81,14 +81,36 @@ All settings are at the top of `cube_counter.py`:
 | `MAX_MISSED_FRAMES` | Frames a cube can disappear before it is forgotten |
 | `MATCH_MARGIN` | How far a cube can move between frames and still be the same cube |
 
+## Arduino firmware
+
+[`arduino/maze_robot/`](arduino/maze_robot/) runs on an **Arduino Mega 2560 Pro** and contains the robot's low-level building blocks:
+
+| File | Contents |
+|---|---|
+| `maze_robot.ino` | Pins, globals, `setup()`, `loop()`, startup sequence (gyro calibration, then sensor calibration) |
+| `Gyro.ino` | MPU6050 with its DMP: heading reading, PID straight moves (`gyroDriveStraightPID`) and PID turns to an angle (`gyroTurnPID`) |
+| `Utils.ino` | Motors (TB6612FNG), ultrasonic distance in cm (`readDistanceCm`), left / right infrared proximity sensors (`readProximityLeft/Right`), RGB LED, buzzer, OLED |
+| `Line_Follower.ino` | Line sensor calibration and PID line following |
+| `Bluetooth.ino` | Remote control over Bluetooth (HC-05) for tests |
+
+This version starts in Bluetooth remote control mode (`loop()` calls `handleVoiceCommand()`); the competition's maze sequence is not included.
+
+**Gyro turns, how they work:** the MPU6050's on-chip motion processor (DMP) gives the yaw angle; `gyroTurnPID` spins the robot until the heading error to the target angle is close to zero, with a PD correction on the motor speeds. A second version (`gyroTurnPID_v2`) takes the shortest way around when the angle wraps past ±180°.
+
+### Build and flash
+
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and these libraries: Adafruit SSD1306, Adafruit GFX, SparkFun TB6612FNG, QTRSensors (Pololu), I2Cdevlib MPU6050.
+2. Open `arduino/maze_robot/maze_robot.ino`, select **Arduino Mega or Mega 2560**, and upload.
+
 ## Repository layout
 
 ```
-raspberry_pi/   Raspberry Pi code: cube counter (OpenCV + Picamera2)
+raspberry_pi/          Raspberry Pi: cube counter (OpenCV + Picamera2)
+arduino/maze_robot/    Arduino Mega: motors, gyro moves and turns, wall sensors
 ```
 
-<!-- TODO: add the navigation code (raspberry_pi/) and the Arduino motor sketch (arduino/) with the UART protocol -->
+<!-- TODO: add the maze navigation sequence and the Pi <-> Arduino UART link if found -->
 
 ## Tech
 
-Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, HSV colour segmentation, object tracking, Arduino, C++, UART, ultrasonic and infrared sensors, gyroscope
+Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, HSV colour segmentation, object tracking, Arduino Mega 2560 Pro, C++, MPU6050 (DMP), PID control, UART, ultrasonic and infrared sensors, gyroscope
