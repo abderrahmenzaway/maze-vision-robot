@@ -1,6 +1,6 @@
 # Autonomous Maze Robot with Camera Vision
 
-An autonomous robot that finds its way through a maze and counts coloured cubes with a camera. A Raspberry Pi running embedded Linux handles the vision; an Arduino Mega reads the wall sensors and the gyroscope and drives the motors. The two boards are linked over a serial (UART) connection.
+An autonomous robot that finds its way through a maze and counts coloured cubes with a camera. A Raspberry Pi running embedded Linux handles the vision; an Arduino Mega reads the wall sensors and the gyroscope and drives the motors. The Pi sends codes to the Arduino over a simple 2-bit GPIO link.
 
 Built for the **ENET'Com Sfax robotics competition**, Autonomous category (2025).
 
@@ -20,7 +20,7 @@ Built for the **ENET'Com Sfax robotics competition**, Autonomous category (2025)
 camera ──► Raspberry Pi (embedded Linux)
            cube detection and counting (OpenCV)
                      │
-                     │  serial (UART)
+                     │  2-bit GPIO link (codes 0 to 3)
                      ▼
 1 × ultrasonic ──┐
 2 × infrared   ──┼──► Arduino Mega 2560 Pro ──► 2 × TB6612FNG ──► motors
@@ -81,6 +81,50 @@ All settings are at the top of `cube_counter.py`:
 | `MAX_MISSED_FRAMES` | Frames a cube can disappear before it is forgotten |
 | `MATCH_MARGIN` | How far a cube can move between frames and still be the same cube |
 
+## Pi to Arduino link (2-bit GPIO)
+
+The Raspberry Pi sends information to the Arduino on **two wires, one bit each**, so it can send a code from 0 to 3. What each code means depends on the mission (for example a colour, a number of cubes or a direction).
+
+| Code | BIT1: Pi GPIO 27 → Mega pin 25 | BIT0: Pi GPIO 17 → Mega pin 24 |
+|---|---|---|
+| 0 | LOW | LOW |
+| 1 | LOW | HIGH |
+| 2 | HIGH | LOW |
+| 3 | HIGH | HIGH |
+
+**How it works:**
+
+- The code is a **level**, not a message: the Pi keeps it on the wires until it sends a new one, and the Arduino reads it whenever its program needs it. There is no protocol to parse and no timing to respect on the Pi side.
+- The Pi changes the two bits one after the other, so for a few microseconds the wires can show a wrong code. The Arduino's `readPiCode()` reads the lines twice, 2 ms apart, and only returns a value once both reads agree.
+- Wiring: the two signal wires plus a **common ground**. The Pi's 3.3 V HIGH is read as HIGH by the Mega's 5 V inputs, so no level shifter is needed in this direction. The link only goes from the Pi to the Arduino: never connect a Mega output to a Pi GPIO without a level shifter.
+- Optional: two 10 kΩ pull-down resistors on the Mega side keep the code at 0 while the Pi is booting.
+
+**Code:**
+
+| Side | File | Functions |
+|---|---|---|
+| Raspberry Pi | [`raspberry_pi/pi_link.py`](raspberry_pi/pi_link.py) | `PiLink().send(code)` |
+| Arduino | [`arduino/maze_robot/Link.ino`](arduino/maze_robot/Link.ino) | `readPiCode()`, `waitForPiCode(code, timeoutMs)` |
+
+**Check the wiring:** run `python3 raspberry_pi/pi_link.py --cycle` on the Pi. The Arduino's sensor screen shows `Pi code: 0, 1, 2, 3` changing every second.
+
+Example on the Pi:
+
+```python
+from pi_link import PiLink
+
+link = PiLink()
+link.send(2)   # the Arduino now reads 2
+```
+
+Example on the Arduino:
+
+```cpp
+if (waitForPiCode(3, 5000)) {   // wait up to 5 s for code 3
+  // the mission decides what code 3 means
+}
+```
+
 ## Arduino firmware
 
 [`arduino/maze_robot/`](arduino/maze_robot/) runs on an **Arduino Mega 2560 Pro** and contains the robot's low-level building blocks:
@@ -89,6 +133,7 @@ All settings are at the top of `cube_counter.py`:
 |---|---|
 | `maze_robot.ino` | Pins, globals, `setup()`, `loop()`, startup sequence (gyro calibration) |
 | `Gyro.ino` | MPU6050 with its DMP: heading reading, PID straight moves (`gyroDriveStraightPID`) and PID turns to an angle (`gyroTurnPID`) |
+| `Link.ino` | 2-bit GPIO link from the Raspberry Pi: `readPiCode()`, `waitForPiCode()` |
 | `Utils.ino` | Motors (TB6612FNG), ultrasonic distance in cm (`readDistanceCm`), left / right infrared proximity sensors (`readProximityLeft/Right`), RGB LED, buzzer, OLED |
 
 After the gyro calibration, `loop()` shows the heading, the front distance and both side walls on the OLED, which is used to check the sensors before a run. The competition's maze sequence is not included in this version.
@@ -103,12 +148,12 @@ After the gyro calibration, `loop()` shows the heading, the front distance and b
 ## Repository layout
 
 ```
-raspberry_pi/          Raspberry Pi: cube counter (OpenCV + Picamera2)
+raspberry_pi/          Raspberry Pi: cube counter (OpenCV + Picamera2), 2-bit link to the Arduino
 arduino/maze_robot/    Arduino Mega: motors, gyro moves and turns, wall sensors
 ```
 
-**Not included in this version:** the competition's maze sequence and the Raspberry Pi to Arduino serial link code. This repository contains the vision pipeline and the Arduino building blocks (sensors, gyro moves and turns).
+**Not included in this version:** the competition's mission program (the maze sequence and what each link code means during the run). This repository contains the vision pipeline, the Pi to Arduino link and the Arduino building blocks (sensors, gyro moves and turns).
 
 ## Tech
 
-Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, HSV colour segmentation, object tracking, Arduino Mega 2560 Pro, C++, MPU6050 (DMP), PID control, UART, ultrasonic and infrared sensors, gyroscope
+Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, gpiozero, HSV colour segmentation, object tracking, Arduino Mega 2560 Pro, C++, MPU6050 (DMP), PID control, GPIO link, ultrasonic and infrared sensors, gyroscope

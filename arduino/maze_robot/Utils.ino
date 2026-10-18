@@ -90,6 +90,10 @@ void showSensorScreen(void)
   display.print("  Right IR: ");
   display.print(readProximityRight());
 
+  display.setCursor(0, 48);
+  display.print("Pi code: ");
+  display.print(readPiCode());
+
   display.display();
 }
 

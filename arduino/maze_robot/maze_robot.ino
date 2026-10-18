@@ -4,6 +4,7 @@
  * Sketch files (the Arduino IDE merges them in this order):
  *   maze_robot.ino    -> includes, pin config, global objects, setup() and loop()
  *   Gyro.ino          -> MPU6050 init, angle reading, gyro-based moves
+ *   Link.ino          -> 2-bit GPIO link from the Raspberry Pi (codes 0 to 3)
  *   Utils.ino         -> motors, wall sensors, LED, buzzer, OLED display
  */
 
@@ -52,6 +53,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define PROX_L  22
 #define PROX_R  23
 
+// 2-bit link from the Raspberry Pi (see Link.ino)
+#define PI_BIT0 24  // from Pi GPIO 17
+#define PI_BIT1 25  // from Pi GPIO 27
+
 // =============================== SETUP ================================
 void setup(void)
 {
@@ -67,6 +72,7 @@ void setup(void)
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
+  initPiLink();
 
   // Try OLED at 0x3C, then 0x3D
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
