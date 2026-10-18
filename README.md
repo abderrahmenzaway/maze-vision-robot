@@ -1,6 +1,6 @@
 # Autonomous Maze Robot with Camera Vision
 
-An autonomous robot that finds its way through a maze and counts coloured cubes with a camera. A Raspberry Pi running embedded Linux handles the sensors and the vision; an Arduino drives the motors through a custom UART protocol.
+An autonomous robot that finds its way through a maze and counts coloured cubes with a camera. A Raspberry Pi running embedded Linux handles the vision; an Arduino Mega reads the wall sensors and the gyroscope and drives the motors. The two boards are linked over a serial (UART) connection.
 
 Built for the **ENET'Com Sfax robotics competition**, Autonomous category (2025).
 
@@ -17,19 +17,19 @@ Built for the **ENET'Com Sfax robotics competition**, Autonomous category (2025)
 ## Architecture
 
 ```
-camera            ──┐
-1 × ultrasonic    ──┤     Raspberry Pi (embedded Linux)
-2 × infrared      ──┼──►  cube detection and counting (OpenCV)
-gyroscope         ──┘     wall detection, navigation, heading correction
-                                     │
-                                     │  custom UART protocol
-                                     ▼
-                          Arduino ──► motor drivers ──► motors
+camera ──► Raspberry Pi (embedded Linux)
+           cube detection and counting (OpenCV)
+                     │
+                     │  serial (UART)
+                     ▼
+1 × ultrasonic ──┐
+2 × infrared   ──┼──► Arduino Mega 2560 Pro ──► 2 × TB6612FNG ──► motors
+MPU6050 gyro   ──┘    wall sensing, gyro PID moves and turns, OLED
 ```
 
 - **Maze navigation**: one ultrasonic sensor and two infrared sensors detect the walls; a gyroscope corrects the heading so the robot drives straight and turns accurately.
 - **Vision**: the Pi camera detects cubes of a chosen colour and counts them.
-- **Split design**: high-level logic on the Raspberry Pi, real-time motor control on the Arduino.
+- **Split design**: vision on the Raspberry Pi, sensors and real-time motor control on the Arduino.
 
 ## Cube counter
 
@@ -107,7 +107,7 @@ raspberry_pi/          Raspberry Pi: cube counter (OpenCV + Picamera2)
 arduino/maze_robot/    Arduino Mega: motors, gyro moves and turns, wall sensors
 ```
 
-<!-- TODO: add the maze navigation sequence and the Pi <-> Arduino UART link if found -->
+**Not included in this version:** the competition's maze sequence and the Raspberry Pi to Arduino serial link code. This repository contains the vision pipeline and the Arduino building blocks (sensors, gyro moves and turns).
 
 ## Tech
 
