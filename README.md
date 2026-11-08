@@ -24,7 +24,7 @@ camera ──► Raspberry Pi (embedded Linux)
                      ▼
 1 × ultrasonic ──┐
 2 × infrared   ──┼──► Arduino Mega 2560 Pro ──► 2 × TB6612FNG ──► motors
-MPU6050 gyro   ──┘    wall sensing, gyro PID moves and turns, OLED
+MPU6050 gyro   ──┘    wall sensing, gyro PID moves, OLED
 ```
 
 - **Maze navigation**: one ultrasonic sensor and two infrared sensors detect the walls; a gyroscope corrects the heading so the robot drives straight and turns accurately.
@@ -132,28 +132,28 @@ if (waitForPiCode(3, 5000)) {   // wait up to 5 s for code 3
 | File | Contents |
 |---|---|
 | `maze_robot.ino` | Pins, globals, `setup()`, `loop()`, startup sequence (gyro calibration) |
-| `Gyro.ino` | MPU6050 with its DMP: heading reading, PID straight moves (`gyroDriveStraightPID`) and PID turns to an angle (`gyroTurnPID`) |
+| `Gyro.ino` | MPU6050 (MPU6050_light library): calibration, heading reading (`getAngle`), PID straight moves (`gyroDriveStraightPID`) and heading-corrected forward and backward moves |
 | `Link.ino` | 2-bit GPIO link from the Raspberry Pi: `readPiCode()`, `waitForPiCode()` |
 | `Utils.ino` | Motors (TB6612FNG), ultrasonic distance in cm (`readDistanceCm`), left / right infrared proximity sensors (`readProximityLeft/Right`), RGB LED, buzzer, OLED |
 
 After the gyro calibration, `loop()` shows the heading, the front distance and both side walls on the OLED, which is used to check the sensors before a run. The competition's maze sequence is not included in this version.
 
-**Gyro turns, how they work:** the MPU6050's on-chip motion processor (DMP) gives the yaw angle; `gyroTurnPID` spins the robot until the heading error to the target angle is close to zero, with a PD correction on the motor speeds. A second version (`gyroTurnPID_v2`) takes the shortest way around when the angle wraps past ±180°.
+**Gyro moves, how they work:** at startup, `initGyro()` measures the sensor offsets while the robot stands still. `getAngle()` then integrates the gyroscope (MPU6050_light) and returns the heading in degrees, from -180 to 180. `gyroDriveStraightPID` keeps the robot on a target heading with a PD correction on the motor speeds.
 
 ### Build and flash
 
-1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and these libraries: Adafruit SSD1306, Adafruit GFX, SparkFun TB6612FNG, I2Cdevlib MPU6050.
+1. Install the [Arduino IDE](https://www.arduino.cc/en/software) and these libraries: Adafruit SSD1306, Adafruit GFX, SparkFun TB6612FNG, MPU6050_light (rfetick).
 2. Open `arduino/maze_robot/maze_robot.ino`, select **Arduino Mega or Mega 2560**, and upload.
 
 ## Repository layout
 
 ```
 raspberry_pi/          Raspberry Pi: cube counter (OpenCV + Picamera2), 2-bit link to the Arduino
-arduino/maze_robot/    Arduino Mega: motors, gyro moves and turns, wall sensors
+arduino/maze_robot/    Arduino Mega: motors, gyro moves, wall sensors
 ```
 
-**Not included in this version:** the competition's mission program (the maze sequence and what each link code means during the run). This repository contains the vision pipeline, the Pi to Arduino link and the Arduino building blocks (sensors, gyro moves and turns).
+**Not included in this version:** the competition's mission program (the maze sequence and what each link code means during the run). This repository contains the vision pipeline, the Pi to Arduino link and the Arduino building blocks (sensors, gyro moves).
 
 ## Tech
 
-Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, gpiozero, HSV colour segmentation, object tracking, Arduino Mega 2560 Pro, C++, MPU6050 (DMP), PID control, GPIO link, ultrasonic and infrared sensors, gyroscope
+Raspberry Pi, embedded Linux, Python, OpenCV, Picamera2, gpiozero, HSV colour segmentation, object tracking, Arduino Mega 2560 Pro, C++, MPU6050 (MPU6050_light), PID control, GPIO link, ultrasonic and infrared sensors, gyroscope

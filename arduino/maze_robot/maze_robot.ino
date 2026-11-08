@@ -3,7 +3,7 @@
  *
  * Sketch files (the Arduino IDE merges them in this order):
  *   maze_robot.ino    -> includes, pin config, global objects, setup() and loop()
- *   Gyro.ino          -> MPU6050 init, angle reading, gyro-based moves
+ *   Gyro.ino          -> MPU6050 init, angle reading (MPU6050_light), gyro-based moves
  *   Link.ino          -> 2-bit GPIO link from the Raspberry Pi (codes 0 to 3)
  *   Utils.ino         -> motors, wall sensors, LED, buzzer, OLED display
  */
@@ -12,11 +12,12 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <SparkFun_TB6612.h>
-#include <MPU6050_6Axis_MotionApps612.h>
+#include <MPU6050_light.h>
 
 // ============================== MPU6050 ==============================
-// Default I2C address is 0x68 (AD0 low). Use MPU6050 mpu(0x69) if AD0 is high.
-MPU6050 mpu;
+// MPU6050_light library. Default I2C address 0x68 (AD0 low);
+// if AD0 is high, call mpu.setAddress(0x69) before mpu.begin().
+MPU6050 mpu(Wire);
 
 // ======================== TB6612FNG MOTOR DRIVER ======================
 #define AIN1    2

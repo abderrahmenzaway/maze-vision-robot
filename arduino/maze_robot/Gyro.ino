@@ -1,21 +1,8 @@
 // ============================================================
-//  Gyro.ino - MPU6050 (DMP) initialisation and gyro-based moves
+//  Gyro.ino - MPU6050 initialisation and angle reading
+//  Library: MPU6050_light (rfetick), install it from the Library Manager
 // ============================================================
 
-#define INTERRUPT_PIN 43
-
-// MPU control/status
-bool dmpReady = false;   // True if DMP init succeeded
-uint8_t mpuIntStatus;    // Interrupt status byte from MPU
-uint8_t devStatus;       // Status after each device operation (0 = success)
-uint16_t packetSize;     // Expected DMP packet size (default 42 bytes)
-uint16_t fifoCount;      // Number of bytes currently in FIFO
-uint8_t fifoBuffer[64];  // FIFO storage buffer
-
-// Orientation
-Quaternion q;            // [w, x, y, z] quaternion
-VectorFloat gravity;     // [x, y, z]    gravity vector
-float ypr[3];            // [yaw, pitch, roll]
 float angle;
 
 // Gyro PID
@@ -37,121 +24,38 @@ float Kpg = 0;
 float Kdg = 0;
 float Kig = 0;
 
-// ======================= INTERRUPT ROUTINE =======================
-volatile bool mpuInterrupt = false;  // True when MPU interrupt pin goes high
-
-void dmpDataReady(void)
-{
-  mpuInterrupt = true;
-}
-
 // ========================= INITIALISATION ========================
+// Keep the robot still and flat while this runs (about 1 s).
 void initGyro(void)
 {
-  Serial.println(F("Initializing I2C devices..."));
-  mpu.initialize();
-  delay(100);
-  pinMode(INTERRUPT_PIN, INPUT);
-
-  Serial.println(F("Testing device connections..."));
-  Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-
-  Serial.println(F("Initializing DMP..."));
-  devStatus = mpu.dmpInitialize();
-
-  // Optional: supply your own offsets here
-  // mpu.setXGyroOffset(51);
-  // mpu.setYGyroOffset(8);
-  // mpu.setZGyroOffset(21);
-  // mpu.setXAccelOffset(1150);
-  // mpu.setYAccelOffset(-50);
-  // mpu.setZAccelOffset(1060);
-
-  if (devStatus == 0) {
-    // Generate offsets and calibrate
-    // mpu.CalibrateAccel(6);
-    mpu.CalibrateGyro(6);
-    Serial.println();
-    mpu.PrintActiveOffsets();
-
-    Serial.println(F("Enabling DMP..."));
-    mpu.setDMPEnabled(true);
-
-    Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-    Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
-    Serial.println(F(")..."));
-    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-    mpuIntStatus = mpu.getIntStatus();
-
-    Serial.println(F("DMP ready! Waiting for first interrupt..."));
-    dmpReady = true;
-    packetSize = mpu.dmpGetFIFOPacketSize();
-  } else {
-    // 1 = initial memory load failed
-    // 2 = DMP configuration updates failed
-    Serial.print(F("DMP Initialization failed (code "));
-    Serial.print(devStatus);
-    Serial.println(F(")"));
+  Wire.begin();
+  byte status = mpu.begin();
+  Serial.print(F("MPU6050 status: "));
+  Serial.println(status);  // 0 = OK
+  if (status != 0) {
+    Serial.println(F("MPU6050 not found, check the wiring"));
+    return;
   }
+
+  Serial.println(F("Calculating offsets, do not move the robot..."));
+  delay(1000);
+  mpu.calcOffsets();  // Gyro and accelerometer offsets
+  Serial.println(F("Gyro ready"));
 }
 
-// Reads the latest FIFO packet, recovering from overflow
-uint8_t GetCurrentFIFOPacket(uint8_t *data, uint8_t length)
-{
-  uint8_t Error;
-  uint8_t Flag = 0;
-  uint8_t overflowed = 0;
-
-  do {
-    if ((Error = (fifoCount = mpu.getFIFOCount()) % length)) {
-      if ((Error = (fifoCount = mpu.getFIFOCount()) % length)) {
-        mpuIntStatus = mpu.getIntStatus();
-        if (mpuIntStatus & _BV(MPU6050_INTERRUPT_FIFO_OFLOW_BIT)) {
-          mpu.getFIFOBytes(data, Error);   // Remove the overflow portion
-          mpu.getFIFOBytes(data, length);
-          overflowed = 1;
-          // Bytes may have arrived after we freed up space
-          if ((Error = (fifoCount = mpu.getFIFOCount()) % length)) {
-            mpu.getFIFOBytes(data, Error);
-            if ((fifoCount = mpu.getFIFOCount()) % length) {
-              mpu.resetFIFO();
-              Serial.println(F("Failed to recover overflow error"));
-              return 0;
-            }
-          }
-        }
-      }
-    }
-
-    fifoCount = mpu.getFIFOCount();
-    if (fifoCount >= packetSize) {
-      mpu.getFIFOBytes(data, length);
-      Flag = 1 + overflowed;
-      fifoCount -= packetSize;
-    }
-  } while (fifoCount >= packetSize);
-
-  return Flag;
-}
-
-float getYaw(uint8_t *data)
-{
-  mpu.dmpGetQuaternion(&q, data);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-  return ypr[0] * 180 / M_PI;
-}
-
-// Returns the current yaw angle in degrees (-180 .. 180)
+// ========================== ANGLE READING ========================
+// Returns the current heading (yaw) in degrees, wrapped to -180 .. 180.
+// MPU6050_light integrates the gyro on each update(), so call this often
+// (every loop iteration while moving).
 float getAngle(void)
 {
-  GetCurrentFIFOPacket(fifoBuffer, packetSize);
-  return getYaw(fifoBuffer);
+  mpu.update();
+  float a = fmod(mpu.getAngleZ() + 180.0, 360.0);
+  if (a < 0) a += 360.0;
+  return a - 180.0;
 }
 
 // ========================= GYRO MOVES ============================
-
-// Simple bang-bang heading hold around "zero" (handles the +/-180 wrap)
 
 // Drive straight holding the heading "Setpoint" (PID, no angle wrap)
 void gyroDriveStraightPID(float Setpoint, int16_t vitesse)
@@ -180,6 +84,7 @@ void gyroDriveStraightPID(float Setpoint, int16_t vitesse)
   setMotorSpeeds(motorspeedag, motorspeedbg);
   lastErrorg = errorg;
 }
+
 // Drive forward, correcting slightly toward heading x
 void gyroForward(int16_t x, int16_t vitesse)
 {
